@@ -25,8 +25,11 @@ function App() {
   >([]);
   const [loading, setLoading] = useState(false);
 
-  const [question, setQuestion] = useState("");
+  const [questions, setQuestions] = useState<
+    { question: string; answer: "O" | "X" }[]
+  >([]);
   const [answer, setAnswer] = useState<"O" | "X" | "">("");
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   const handleAddBubble = async () => {
     if (text.trim()) {
@@ -36,28 +39,28 @@ function App() {
       setLoading(true);
       try {
         const response = await axios.post(
-          "https://your-backend-api.com/endpoint",
-          { text }
-        );
-
-        setBubbles((prev) => [
-          ...prev,
-          { type: "reply", text: response.data.reply }
-        ]);
-
-        setQuestion(
-          "이 지문에 대한 질문입니다. 맞으면 O, 틀리면 X를 선택하세요."
-        );
-
-        setBubbles((prev) => [
-          ...prev,
+          "http://localhost:8080/api/v1/chat/summary",
           {
-            type: "question",
-            text: "실제 문제 O 일까요 X 일까요?"
+            prompt: text
+          },
+          {
+            headers: {
+              "Content-Type": "application/json"
+            }
           }
+        );
+        console.log("Response:", response.data);
+        setBubbles((prev) => [
+          ...prev,
+          { type: "reply", text: response.data.summary }
         ]);
+
+        setQuestions(response.data.oxQuizzes);
+        setCurrentQuestionIndex(0);
+        setAnswer("");
       } catch (error) {
         console.error("Error fetching reply:", error);
+
         setBubbles((prev) => [
           ...prev,
           { type: "reply", text: "답변을 가져오는 데 실패했습니다." }
@@ -70,8 +73,19 @@ function App() {
 
   const handleAnswerSubmit = async (selectedAnswer: "O" | "X") => {
     setAnswer(selectedAnswer);
-    alert(`Submitted answer: ${selectedAnswer}`);
-    // Here you can send the answer to the backend or handle it as needed
+    const currentQuestion = questions[currentQuestionIndex];
+    const isCorrect = currentQuestion.answer === selectedAnswer;
+
+    alert(
+      `${isCorrect ? "correct" : "incorrect"}. 정답 : ${currentQuestion.answer}.`
+    );
+
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setAnswer("");
+    } else {
+      alert("모든 문제를 푸셨습니다!");
+    }
   };
 
   useEffect(() => {
@@ -83,7 +97,7 @@ function App() {
       {show ? (
         <div className="w-full h-full flex flex-col items-center px-[15%] py-[2%] overflow-y-scroll">
           <p className=" font-bold text-3xl mb-8">Level up! 😆</p>
-          <div className="chat chat-start self-start w-[50%] space-y-4">
+          <div className="chat chat-start self-start w-[50%] space-y-8 mb-8">
             <div
               data-aos="zoom-in-up"
               className="chat-bubble bg-neutral text-white"
@@ -91,7 +105,7 @@ function App() {
               제가 이해를 도울게요!
             </div>
           </div>
-          <div className="w-full flex flex-col items-center space-y-4">
+          <div className="w-full flex flex-col items-center space-y-8">
             {bubbles.map((bubble, index) => (
               <div
                 key={index}
@@ -102,6 +116,33 @@ function App() {
               </div>
             ))}
           </div>
+          {questions.length > 0 && currentQuestionIndex < questions.length && (
+            <div className="w-full flex flex-col items-center mt-80">
+              <p className="text-xl mb-2">
+                {questions[currentQuestionIndex].question}
+              </p>
+              <div className="flex space-x-4">
+                <button
+                  className={`btn ${
+                    answer === "O" ? "btn-success" : "btn-outline"
+                  } w-20`}
+                  onClick={() => handleAnswerSubmit("O")}
+                  disabled={loading || answer !== ""}
+                >
+                  O
+                </button>
+                <button
+                  className={`btn ${
+                    answer === "X" ? "btn-error" : "btn-outline"
+                  } w-20`}
+                  onClick={() => handleAnswerSubmit("X")}
+                  disabled={loading || answer !== ""}
+                >
+                  X
+                </button>
+              </div>
+            </div>
+          )}
           {loading && (
             <div
               className="chat-bubble bg-neutral text-white self-start"
@@ -125,27 +166,6 @@ function App() {
               send
             </button>
           </div>
-          {question && (
-            <div className="w-full flex flex-col items-center mt-4">
-              <p className="text-xl mb-2">{question}</p>
-              <div className="flex space-x-4">
-                <button
-                  className={`btn ${answer === "O" ? "btn-success" : "btn-outline"} w-20`}
-                  onClick={() => handleAnswerSubmit("O")}
-                  disabled={loading || answer !== null}
-                >
-                  O
-                </button>
-                <button
-                  className={`btn ${answer === "X" ? "btn-error" : "btn-outline"} w-20`}
-                  onClick={() => handleAnswerSubmit("X")}
-                  disabled={loading || answer !== null}
-                >
-                  X
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <>
